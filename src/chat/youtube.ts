@@ -68,11 +68,17 @@ export async function autoYouTubeChat(
       res.data.items?.forEach((item) => {
         if (item.snippet?.type !== "textMessageEvent") return;
 
+        const yBadges: string[] = [];
+        if (item.authorDetails?.isChatOwner)      yBadges.push("👑");
+        if (item.authorDetails?.isChatModerator)  yBadges.push("🛡️");
+        if (item.authorDetails?.isChatSponsor)    yBadges.push("🌟");
+
         push({
           platform: "youtube",
           user: item.authorDetails?.displayName ?? "anon",
           text: item.snippet.displayMessage ?? "",
           color: "#FF0000",
+          badges: yBadges
         });
       });
 

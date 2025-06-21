@@ -9,37 +9,39 @@
         animation: fade 0.5s ease-in forwards;
       }
       @keyframes fade {
-        to {
-          opacity: 0;
-          transform: translateY(-20px);
-        }
+        to { opacity: 0; transform: translateY(-20px); }
       }
     </style>
   </head>
 
   <body class="overflow-hidden">
     <div class="fixed bottom-4 left-4 h-1/2 w-[320px]">
-      <ul
-        id="chat"
-        class="flex flex-col-reverse gap-1 text-sm h-full overflow-hidden"
-      ></ul>
+      <ul id="chat" class="flex flex-col-reverse gap-1 text-sm h-full overflow-hidden"></ul>
     </div>
 
     <script type="module">
       const chat = document.getElementById("chat");
       const HISTORY_LIMIT = 50;
 
-      const addMsg = ({ platform, user, text, color }) => {
+      const addMsg = ({ platform, user, text, color, badges = [] }) => {
         const li = document.createElement("li");
-
         li.className =
           "px-3 py-1.5 rounded-md text-sm w-full break-words shadow-lg backdrop-blur-sm text-white border-l-4";
         li.style.background = "rgba(0, 0, 0, 0.6)";
         li.style.borderColor = platform === "twitch" ? "#9146FF" : "#FF0000";
 
-        const usernameColor =
-          platform === "twitch" && color ? color : "#FF4F4F";
-        li.innerHTML = `<span style="color:${usernameColor}; text-shadow: 0 0 2px black, 0 0 2px black;" class="font-bold">${user}:</span> ${text}`;
+        const usernameColor = platform === "twitch" && color ? color : "#FF4F4F";
+        const iconHtml = badges
+          .map(b =>
+            b.startsWith("http")
+              ? `<img src="${b}" class="inline h-4 w-4 mr-1 align-text-bottom" />`
+              : `<span class="mr-1">${b}</span>`
+          )
+          .join("");
+
+        li.innerHTML =
+          `${iconHtml}<span style="color:${usernameColor}; text-shadow:0 0 2px black" class="font-bold">${user}:</span> ${text}`;
+
         chat.prepend(li);
 
         setTimeout(() => li.classList.add("fade-out"), 24_000);
@@ -49,22 +51,15 @@
       };
 
       let ws;
-
       const connect = () => {
         ws = new WebSocket(`ws://${location.host}`);
-        ws.onopen = () => console.log("[WS] conectado");
         ws.onmessage = (ev) => {
           const payload = JSON.parse(ev.data);
-          if (Array.isArray(payload)) payload.forEach(addMsg);
-          else addMsg(payload);
+          Array.isArray(payload) ? payload.forEach(addMsg) : addMsg(payload);
         };
-        ws.onclose = () => {
-          console.warn("[WS] desconectado — tentando em 3 s…");
-          setTimeout(connect, 3000);
-        };
-        ws.onerror = () => ws.close();
+        ws.onclose = () => setTimeout(connect, 3000);
+        ws.onerror  = () => ws.close();
       };
-
       connect();
     </script>
   </body>
