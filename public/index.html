@@ -2,15 +2,13 @@
 <html lang="en" class="bg-transparent">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script defer src="https://cdn.tailwindcss.com"></script>
     <style>
       .fade-out {
         animation: fade 0.5s ease-in forwards;
       }
+
       @keyframes fade {
         to {
           opacity: 0;
@@ -32,13 +30,13 @@
 
       const addMsg = ({ platform, user, text, color }) => {
         const li = document.createElement("li");
-        li.className =
-          "px-3 py-1 rounded-xl text-sm max-w-full break-words shadow-lg backdrop-blur-sm";
-        li.style.background =
-          platform === "twitch"
-            ? "rgba(145,70,255,0.25)"
-            : "rgba(255,0,0,0.25)";
-        li.innerHTML = `<span style="color:${color}" class="font-bold">${user}:</span> ${text}`;
+
+        li.className = "px-3 py-2 rounded-lg text-sm max-w-full break-words shadow-lg backdrop-blur-sm text-white border-l-4";
+        li.style.background = "rgba(0, 0, 0, 0.6)";
+        li.style.borderColor = platform === "twitch" ? "#9146FF" : "#FF0000";
+
+        const usernameColor = platform === "twitch" && color ? color : "#FF4F4F";
+        li.innerHTML = `<span style="color:${usernameColor}; text-shadow: 0 0 2px black, 0 0 2px black;" class="font-bold">${user}:</span> ${text}`;
         chat.prepend(li);
 
         setTimeout(() => li.classList.add("fade-out"), 24_000);
