@@ -13,7 +13,7 @@ function ytColor(a: youtube_v3.Schema$LiveChatMessageAuthorDetails) {
 function ytBadges(a: youtube_v3.Schema$LiveChatMessageAuthorDetails) {
   const b: string[] = [];
   if (a.isChatOwner)     b.push("👑");
-  if (a.isChatModerator) b.push("🔧");
+  if (a.isChatModerator) b.push("🛠️");
   if (a.isChatSponsor)   b.push("🌟");
   return b;
 }
