@@ -39,22 +39,20 @@ export async function autoYouTubeChat(
   let liveChatId: string | null = null;
   let nextPageToken: string | undefined;
 
-  // ---------- ❶ loop que garante ter um liveChatId ----------
   async function ensureChatId() {
     liveChatId = await getLiveChatId(channelId, apiKey);
     if (!liveChatId) {
       console.log("↻ Nenhuma live ativa — tentando novamente em 30 s…");
-      setTimeout(ensureChatId, 30_000);           // tenta de novo em 30 s
+      setTimeout(ensureChatId, 30_000);
     } else {
       console.log("📺 liveChatId DETECTADO:", liveChatId);
       nextPageToken = undefined;
-      poll();                                     // começa a escutar o chat
+      poll();
     }
   }
 
-  // ---------- ❷ loop de polling do chat ----------
   async function poll() {
-    if (!liveChatId) return;                      // segurança
+    if (!liveChatId) return;
 
     try {
       const res = await youtube.liveChatMessages.list({
@@ -80,14 +78,12 @@ export async function autoYouTubeChat(
 
       setTimeout(poll, interval);
     } catch (err: any) {
-      // live terminou ou chatId expirou
       console.warn("⚠️ YT polling error:", err?.errors?.[0]?.reason ?? err);
       console.log("↻ Procurando nova live em 15 s…");
-      liveChatId = null;                          // força nova descoberta
+      liveChatId = null;
       setTimeout(ensureChatId, 15_000);
     }
   }
 
-  // inicia o ciclo
   ensureChatId();
 }
