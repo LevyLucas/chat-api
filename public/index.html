@@ -5,12 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script defer src="https://cdn.tailwindcss.com"></script>
     <style>
-      .fade-out {
-        animation: fade 0.5s ease-in forwards;
-      }
-      @keyframes fade {
-        to { opacity: 0; transform: translateY(-20px); }
-      }
+      .fade-out { animation: fade 0.5s ease-in forwards; }
+      @keyframes fade { to { opacity: 0; transform: translateY(-20px); } }
     </style>
   </head>
 
@@ -26,27 +22,43 @@
       const addMsg = ({ platform, user, text, color, badges = [] }) => {
         const li = document.createElement("li");
         li.className =
-          "px-3 py-1.5 rounded-md text-sm w-full break-words shadow-lg backdrop-blur-sm text-white border-l-4";
-        li.style.background = "rgba(0, 0, 0, 0.6)";
+          "px-3 py-1.5 rounded-md text-sm w-full shadow-lg backdrop-blur-sm text-white border-l-4";
+        li.style.background = "rgba(0,0,0,0.6)";
         li.style.borderColor = platform === "twitch" ? "#9146FF" : "#FF0000";
 
         const usernameColor = platform === "twitch" && color ? color : "#FF4F4F";
-        const iconHtml = badges
-          .map(b =>
-            b.startsWith("http")
-              ? `<img src="${b}" class="inline h-4 w-4 mr-1 align-text-bottom" />`
-              : `<span class="mr-1">${b}</span>`
-          )
-          .join("");
+        const container = document.createElement("div");
+        container.className = "flex items-center flex-wrap";
+        
+        const prefix = document.createElement("span");
+        prefix.className = "flex items-center flex-shrink-0 mr-1";
 
-        li.innerHTML =
-          `${iconHtml}<span style="color:${usernameColor}; text-shadow:0 0 2px black" class="font-bold">${user}:</span> ${text}`;
+        badges.forEach((b) => {
+          const img = document.createElement("img");
+          img.src = b;
+          img.className = "w-4 h-4 mr-1";
+          prefix.appendChild(img);
+        });
 
+        const nick = document.createElement("span");
+        nick.className = "font-bold";
+        nick.style.color = usernameColor;
+        nick.style.textShadow = "0 0 2px black";
+        nick.textContent = `${user}:`;
+
+        prefix.appendChild(nick);
+        container.appendChild(prefix);
+
+        const message = document.createElement("span");
+        message.className = "break-words inline";
+        message.textContent = ` ${text}`;
+
+        container.appendChild(message);
+        li.appendChild(container);
         chat.prepend(li);
 
-        setTimeout(() => li.classList.add("fade-out"), 24_000);
-        setTimeout(() => li.remove(), 24_500);
-
+        setTimeout(() => li.classList.add("fade-out"), 24000);
+        setTimeout(() => li.remove(), 24500);
         while (chat.children.length > HISTORY_LIMIT) chat.lastChild.remove();
       };
 
@@ -58,7 +70,7 @@
           Array.isArray(payload) ? payload.forEach(addMsg) : addMsg(payload);
         };
         ws.onclose = () => setTimeout(connect, 3000);
-        ws.onerror  = () => ws.close();
+        ws.onerror = () => ws.close();
       };
       connect();
     </script>
