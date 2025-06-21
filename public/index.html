@@ -8,7 +8,6 @@
       .fade-out {
         animation: fade 0.5s ease-in forwards;
       }
-
       @keyframes fade {
         to {
           opacity: 0;
@@ -19,10 +18,12 @@
   </head>
 
   <body class="overflow-hidden">
-    <ul
-      id="chat"
-      class="flex flex-col-reverse gap-2 p-2 w-full max-h-screen"
-    ></ul>
+    <div class="fixed bottom-4 left-4 h-1/2 w-[320px]">
+      <ul
+        id="chat"
+        class="flex flex-col-reverse gap-1 text-sm h-full overflow-hidden"
+      ></ul>
+    </div>
 
     <script type="module">
       const chat = document.getElementById("chat");
@@ -31,11 +32,13 @@
       const addMsg = ({ platform, user, text, color }) => {
         const li = document.createElement("li");
 
-        li.className = "px-3 py-2 rounded-lg text-sm max-w-full break-words shadow-lg backdrop-blur-sm text-white border-l-4";
+        li.className =
+          "px-3 py-1.5 rounded-md text-sm w-full break-words shadow-lg backdrop-blur-sm text-white border-l-4";
         li.style.background = "rgba(0, 0, 0, 0.6)";
         li.style.borderColor = platform === "twitch" ? "#9146FF" : "#FF0000";
 
-        const usernameColor = platform === "twitch" && color ? color : "#FF4F4F";
+        const usernameColor =
+          platform === "twitch" && color ? color : "#FF4F4F";
         li.innerHTML = `<span style="color:${usernameColor}; text-shadow: 0 0 2px black, 0 0 2px black;" class="font-bold">${user}:</span> ${text}`;
         chat.prepend(li);
 
@@ -49,23 +52,16 @@
 
       const connect = () => {
         ws = new WebSocket(`ws://${location.host}`);
-
         ws.onopen = () => console.log("[WS] conectado");
-
         ws.onmessage = (ev) => {
           const payload = JSON.parse(ev.data);
-          if (Array.isArray(payload)) {
-            payload.forEach(addMsg);
-          } else {
-            addMsg(payload);
-          }
+          if (Array.isArray(payload)) payload.forEach(addMsg);
+          else addMsg(payload);
         };
-
         ws.onclose = () => {
           console.warn("[WS] desconectado — tentando em 3 s…");
           setTimeout(connect, 3000);
         };
-
         ws.onerror = () => ws.close();
       };
 
