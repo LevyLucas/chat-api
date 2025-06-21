@@ -58,7 +58,7 @@
 
       const message=document.createElement("span");
       message.className="break-words inline";
-      message.textContent=` ${text}`;
+      message.innerHTML = ` ${text}`;
       container.appendChild(message);
 
       li.appendChild(container);
