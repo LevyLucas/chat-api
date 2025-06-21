@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-transparent">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script defer src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .fade-out {
+      animation: fade 0.5s ease-in forwards;
+    }
+    @keyframes fade { to { opacity: 0; transform: translateY(-20px); } }
+  </style>
+</head>
+<body class="overflow-hidden">
+  <ul id="chat" class="flex flex-col-reverse gap-2 p-2 w-full max-h-screen"></ul>
+
+  <script type="module">
+    const chat = document.getElementById("chat");
+    const ws = new WebSocket(`ws://${location.host}`);
+
+    ws.onmessage = (ev) => {
+      const { platform, user, text, color } = JSON.parse(ev.data);
+
+      const li = document.createElement("li");
+      li.className =
+        "px-3 py-1 rounded-xl text-sm max-w-full break-words shadow-lg backdrop-blur-sm";
+      li.style.background =
+        platform === "twitch" ? "rgba(145,70,255,0.25)" : "rgba(255,0,0,0.25)";
+      li.innerHTML = `<span style="color:${color}" class="font-bold">${user}:</span> ${text}`;
+
+      chat.prepend(li);
+      // remove após 25 s
+      setTimeout(() => li.classList.add("fade-out"), 24000);
+      setTimeout(() => li.remove(), 24500);
+    };
+  </script>
+</body>
+</html>
