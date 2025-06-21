@@ -9,13 +9,13 @@ import { ChatMessage } from "./types/ChatMessage";
 
 dotenv.config();
 
-const PORT = Number(process.env.PORT) || 8080;
+const PORT = Number(process.env.PORT) || 80;
 const TWITCH_CHANNEL = process.env.TWITCH_CHANNEL!;
 const HISTORY_SIZE = 50;
 const history: ChatMessage[] = [];
 
 const app = express();
-app.use("/overlay", express.static(path.join(__dirname, "..", "public")));
+app.use("/chat", express.static(path.join(__dirname, "..", "public")));
 
 const server = app.listen(PORT, "0.0.0.0", () =>
   console.log(`🚀 Server on http://localhost:${PORT}`)
