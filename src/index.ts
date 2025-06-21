@@ -9,7 +9,7 @@ import { ChatMessage } from "./types/ChatMessage";
 
 dotenv.config();
 
-const PORT = Number(process.env.PORT) || 80;
+const PORT = Number(process.env.PORT) || 3001;
 const TWITCH_CHANNEL = process.env.TWITCH_CHANNEL!;
 const HISTORY_SIZE = 50;
 const history: ChatMessage[] = [];
