@@ -71,13 +71,14 @@
 
     let ws;
     function connect(){
-      ws=new WebSocket(`ws://${location.host}`);
-      ws.onmessage=e=>{
-        const payload=JSON.parse(e.data);
-        Array.isArray(payload)?payload.forEach(addMsg):addMsg(payload);
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${protocol}://${location.host}/chat`);
+      ws.onmessage = e => {
+        const payload = JSON.parse(e.data);
+        Array.isArray(payload) ? payload.forEach(addMsg) : addMsg(payload);
       };
-      ws.onclose=()=>setTimeout(connect,3000);
-      ws.onerror =()=>ws.close();
+      ws.onclose = () => setTimeout(connect, 3000);
+      ws.onerror = () => ws.close();
     }
     connect();
   </script>
