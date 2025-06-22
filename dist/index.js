@@ -17,18 +17,27 @@ const history = [];
 const app = (0, express_1.default)();
 app.use("/chat", express_1.default.static(path_1.default.join(__dirname, "..", "public")));
 const server = app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server on http://localhost:${PORT}`));
-const wss = new ws_1.WebSocketServer({ server });
+const wss = new ws_1.WebSocketServer({ noServer: true });
+server.on("upgrade", (req, socket, head) => {
+    if (req.url === "/chat" || req.url === "/chat/") {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+            wss.emit("connection", ws, req);
+        });
+    }
+    else {
+        socket.destroy();
+    }
+});
 function broadcast(msg) {
     history.push(msg);
     if (history.length > HISTORY_SIZE)
         history.shift();
-    const data = JSON.stringify(msg);
-    wss.clients.forEach((c) => c.readyState === 1 && c.send(data));
+    const payload = JSON.stringify(msg);
+    wss.clients.forEach((c) => c.readyState === 1 && c.send(payload));
 }
 wss.on("connection", (socket) => {
-    if (history.length) {
+    if (history.length)
         socket.send(JSON.stringify(history));
-    }
 });
 (0, twitch_1.initTwitch)(TWITCH_CHANNEL, broadcast);
 (0, youtube_1.autoYouTubeChat)(process.env.YT_CHANNEL_ID, process.env.YT_API_KEY, broadcast);
