@@ -36,9 +36,12 @@ function ytMessageHtml(item) {
     }
     return html;
 }
+const channelCache = new Map();
 async function resolveChannelId(input, key) {
     if (input.startsWith("UC"))
         return input.trim();
+    if (channelCache.has(input))
+        return channelCache.get(input);
     const handle = input.match(/youtube\.com\/(channel\/|user\/|@)?([^/?#]+)/i)?.[2] || input;
     const r = await youtube.search.list({
         auth: key,
@@ -50,6 +53,7 @@ async function resolveChannelId(input, key) {
     const id = r.data.items?.[0]?.id?.channelId;
     if (!id)
         throw new Error("canal não encontrado");
+    channelCache.set(input, id);
     return id;
 }
 async function findLiveId(cid, key) {
@@ -82,9 +86,9 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
     }
     let liveChatId = null;
     let nextPageToken;
+    let foundLive = false;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const MIN_DELAY = 15000;
-    const POLL_MULT = 4;
+    const POLL_MULT = 1.5;
     let searchInt = 15000;
     const MAX_SEARCH = 30 * 60000;
     async function pollChat() {
@@ -98,7 +102,7 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
                 pageToken: nextPageToken,
             });
             nextPageToken = r.data.nextPageToken ?? undefined;
-            const delay = Math.max((r.data.pollingIntervalMillis ?? 5000) * POLL_MULT, MIN_DELAY);
+            const delay = Math.max((r.data.pollingIntervalMillis ?? 5000) * POLL_MULT, 5000);
             for (const itm of r.data.items ?? []) {
                 if (itm.snippet?.type !== "textMessageEvent")
                     continue;
@@ -122,10 +126,13 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
             }
             liveChatId = null;
             nextPageToken = undefined;
+            foundLive = false;
             searchLoop();
         }
     }
     async function searchLoop() {
+        if (foundLive)
+            return;
         try {
             const vid = await findLiveId(channelId, apiKey);
             if (vid) {
@@ -134,6 +141,7 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
                     liveChatId = chat;
                     nextPageToken = undefined;
                     searchInt = 15000;
+                    foundLive = true;
                     pollChat();
                     return;
                 }

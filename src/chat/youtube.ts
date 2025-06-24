@@ -33,8 +33,12 @@ function ytMessageHtml(item: youtube_v3.Schema$LiveChatMessage) {
   return html;
 }
 
+const channelCache = new Map<string, string>();
+
 async function resolveChannelId(input: string, key: string) {
   if (input.startsWith("UC")) return input.trim();
+  if (channelCache.has(input)) return channelCache.get(input)!;
+
   const handle = input.match(/youtube\.com\/(channel\/|user\/|@)?([^/?#]+)/i)?.[2] || input;
   const r = await youtube.search.list({
     auth: key,
@@ -45,6 +49,7 @@ async function resolveChannelId(input: string, key: string) {
   });
   const id = r.data.items?.[0]?.id?.channelId;
   if (!id) throw new Error("canal não encontrado");
+  channelCache.set(input, id);
   return id;
 }
 
@@ -84,11 +89,11 @@ export async function autoYouTubeChat(
 
   let liveChatId: string | null = null;
   let nextPageToken: string | undefined;
+  let foundLive = false;
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  const MIN_DELAY = 15_000;
-  const POLL_MULT = 4;
+  const POLL_MULT = 1.5;
   let searchInt = 15_000;
   const MAX_SEARCH = 30 * 60_000;
 
@@ -103,7 +108,7 @@ export async function autoYouTubeChat(
       });
 
       nextPageToken = r.data.nextPageToken ?? undefined;
-      const delay = Math.max((r.data.pollingIntervalMillis ?? 5_000) * POLL_MULT, MIN_DELAY);
+      const delay = Math.max((r.data.pollingIntervalMillis ?? 5_000) * POLL_MULT, 5_000);
 
       for (const itm of r.data.items ?? []) {
         if (itm.snippet?.type !== "textMessageEvent") continue;
@@ -126,11 +131,13 @@ export async function autoYouTubeChat(
       }
       liveChatId = null;
       nextPageToken = undefined;
+      foundLive = false;
       searchLoop();
     }
   }
 
   async function searchLoop() {
+    if (foundLive) return;
     try {
       const vid = await findLiveId(channelId, apiKey);
       if (vid) {
@@ -139,6 +146,7 @@ export async function autoYouTubeChat(
           liveChatId = chat;
           nextPageToken = undefined;
           searchInt = 15_000;
+          foundLive = true;
           pollChat();
           return;
         }
@@ -146,6 +154,7 @@ export async function autoYouTubeChat(
     } catch (e: any) {
       console.error(e?.response?.data?.error ?? e);
     }
+
     await sleep(searchInt);
     searchInt = Math.min(searchInt * 2, MAX_SEARCH);
     searchLoop();
