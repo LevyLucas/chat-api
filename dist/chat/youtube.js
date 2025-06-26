@@ -88,9 +88,11 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
     let nextPageToken;
     let searchRunning = false;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const POLL_MULT = 1.5;
-    let searchInt = 15000;
+    const POLL_MULT = 3;
+    const MIN_POLL_DELAY = 7000;
     const MAX_SEARCH = 30 * 60000;
+    let searchInt = 15000;
+    let quotaErrors = 0;
     async function pollChat() {
         if (!liveChatId)
             return;
@@ -102,7 +104,7 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
                 pageToken: nextPageToken,
             });
             nextPageToken = r.data.nextPageToken ?? undefined;
-            const delay = Math.max((r.data.pollingIntervalMillis ?? 5000) * POLL_MULT, 5000);
+            const delay = Math.max((r.data.pollingIntervalMillis ?? 5000) * POLL_MULT, MIN_POLL_DELAY);
             for (const itm of r.data.items ?? []) {
                 if (itm.snippet?.type !== "textMessageEvent")
                     continue;
@@ -114,12 +116,25 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
                     badges: ytBadges(itm.authorDetails),
                 });
             }
+            quotaErrors = 0;
             setTimeout(pollChat, delay);
         }
         catch (e) {
             const reason = e?.response?.data?.error?.errors?.[0]?.reason ?? e?.code ?? "desconhecido";
             console.warn(`[YouTube] pollChat error: ${reason}`);
-            await sleep(reason === "quotaExceeded" ? 15 * 60000 : 30000);
+            if (reason === "quotaExceeded") {
+                quotaErrors++;
+                if (quotaErrors >= 3) {
+                    console.warn("[YouTube] Limite de quota excedido repetidamente. Pausando por 1 hora.");
+                    await sleep(60 * 60000);
+                }
+                else {
+                    await sleep(15 * 60000);
+                }
+            }
+            else {
+                await sleep(30000);
+            }
             liveChatId = null;
             nextPageToken = undefined;
             searchLoop();
@@ -138,6 +153,7 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
                         liveChatId = chat;
                         nextPageToken = undefined;
                         searchInt = 15000;
+                        quotaErrors = 0;
                         console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
                         pollChat();
                         break;

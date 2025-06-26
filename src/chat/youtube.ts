@@ -92,9 +92,12 @@ export async function autoYouTubeChat(
   let searchRunning = false;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  const POLL_MULT = 1.5;
-  let searchInt = 15_000;
+  const POLL_MULT = 3;
+  const MIN_POLL_DELAY = 7000;
   const MAX_SEARCH = 30 * 60_000;
+  let searchInt = 15_000;
+
+  let quotaErrors = 0;
 
   async function pollChat() {
     if (!liveChatId) return;
@@ -107,7 +110,10 @@ export async function autoYouTubeChat(
       });
 
       nextPageToken = r.data.nextPageToken ?? undefined;
-      const delay = Math.max((r.data.pollingIntervalMillis ?? 5_000) * POLL_MULT, 5_000);
+      const delay = Math.max(
+        (r.data.pollingIntervalMillis ?? 5_000) * POLL_MULT,
+        MIN_POLL_DELAY
+      );
 
       for (const itm of r.data.items ?? []) {
         if (itm.snippet?.type !== "textMessageEvent") continue;
@@ -120,12 +126,25 @@ export async function autoYouTubeChat(
         });
       }
 
+      quotaErrors = 0;
       setTimeout(pollChat, delay);
     } catch (e: any) {
       const reason =
         e?.response?.data?.error?.errors?.[0]?.reason ?? e?.code ?? "desconhecido";
       console.warn(`[YouTube] pollChat error: ${reason}`);
-      await sleep(reason === "quotaExceeded" ? 15 * 60_000 : 30_000);
+
+      if (reason === "quotaExceeded") {
+        quotaErrors++;
+        if (quotaErrors >= 3) {
+          console.warn("[YouTube] Limite de quota excedido repetidamente. Pausando por 1 hora.");
+          await sleep(60 * 60_000);
+        } else {
+          await sleep(15 * 60_000);
+        }
+      } else {
+        await sleep(30_000);
+      }
+
       liveChatId = null;
       nextPageToken = undefined;
       searchLoop();
@@ -145,6 +164,7 @@ export async function autoYouTubeChat(
             liveChatId = chat;
             nextPageToken = undefined;
             searchInt = 15_000;
+            quotaErrors = 0;
             console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
             pollChat();
             break;
