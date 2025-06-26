@@ -86,7 +86,7 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
     }
     let liveChatId = null;
     let nextPageToken;
-    let foundLive = false;
+    let searchRunning = false;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const POLL_MULT = 1.5;
     let searchInt = 15000;
@@ -118,41 +118,39 @@ async function autoYouTubeChat(rawChannel, apiKey, push) {
         }
         catch (e) {
             const reason = e?.response?.data?.error?.errors?.[0]?.reason ?? e?.code ?? "desconhecido";
-            if (reason === "quotaExceeded") {
-                await sleep(15 * 60000);
-            }
-            else {
-                await sleep(30000);
-            }
+            console.warn(`[YouTube] pollChat error: ${reason}`);
+            await sleep(reason === "quotaExceeded" ? 15 * 60000 : 30000);
             liveChatId = null;
             nextPageToken = undefined;
-            foundLive = false;
             searchLoop();
         }
     }
     async function searchLoop() {
-        if (foundLive)
+        if (searchRunning)
             return;
-        try {
-            const vid = await findLiveId(channelId, apiKey);
-            if (vid) {
-                const chat = await fetchChatId(vid, apiKey);
-                if (chat) {
-                    liveChatId = chat;
-                    nextPageToken = undefined;
-                    searchInt = 15000;
-                    foundLive = true;
-                    pollChat();
-                    return;
+        searchRunning = true;
+        while (!liveChatId) {
+            try {
+                const vid = await findLiveId(channelId, apiKey);
+                if (vid) {
+                    const chat = await fetchChatId(vid, apiKey);
+                    if (chat) {
+                        liveChatId = chat;
+                        nextPageToken = undefined;
+                        searchInt = 15000;
+                        console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
+                        pollChat();
+                        break;
+                    }
                 }
             }
+            catch (e) {
+                console.error("[YouTube] searchLoop error:", e?.response?.data?.error ?? e);
+            }
+            await sleep(searchInt);
+            searchInt = Math.min(searchInt * 2, MAX_SEARCH);
         }
-        catch (e) {
-            console.error(e?.response?.data?.error ?? e);
-        }
-        await sleep(searchInt);
-        searchInt = Math.min(searchInt * 2, MAX_SEARCH);
-        searchLoop();
+        searchRunning = false;
     }
     searchLoop();
 }

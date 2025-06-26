@@ -89,8 +89,7 @@ export async function autoYouTubeChat(
 
   let liveChatId: string | null = null;
   let nextPageToken: string | undefined;
-  let foundLive = false;
-
+  let searchRunning = false;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const POLL_MULT = 1.5;
@@ -120,44 +119,46 @@ export async function autoYouTubeChat(
           badges: ytBadges(itm.authorDetails!),
         });
       }
+
       setTimeout(pollChat, delay);
     } catch (e: any) {
       const reason =
         e?.response?.data?.error?.errors?.[0]?.reason ?? e?.code ?? "desconhecido";
-      if (reason === "quotaExceeded") {
-        await sleep(15 * 60_000);
-      } else {
-        await sleep(30_000);
-      }
+      console.warn(`[YouTube] pollChat error: ${reason}`);
+      await sleep(reason === "quotaExceeded" ? 15 * 60_000 : 30_000);
       liveChatId = null;
       nextPageToken = undefined;
-      foundLive = false;
       searchLoop();
     }
   }
 
   async function searchLoop() {
-    if (foundLive) return;
-    try {
-      const vid = await findLiveId(channelId, apiKey);
-      if (vid) {
-        const chat = await fetchChatId(vid, apiKey);
-        if (chat) {
-          liveChatId = chat;
-          nextPageToken = undefined;
-          searchInt = 15_000;
-          foundLive = true;
-          pollChat();
-          return;
+    if (searchRunning) return;
+    searchRunning = true;
+
+    while (!liveChatId) {
+      try {
+        const vid = await findLiveId(channelId, apiKey);
+        if (vid) {
+          const chat = await fetchChatId(vid, apiKey);
+          if (chat) {
+            liveChatId = chat;
+            nextPageToken = undefined;
+            searchInt = 15_000;
+            console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
+            pollChat();
+            break;
+          }
         }
+      } catch (e: any) {
+        console.error("[YouTube] searchLoop error:", e?.response?.data?.error ?? e);
       }
-    } catch (e: any) {
-      console.error(e?.response?.data?.error ?? e);
+
+      await sleep(searchInt);
+      searchInt = Math.min(searchInt * 2, MAX_SEARCH);
     }
 
-    await sleep(searchInt);
-    searchInt = Math.min(searchInt * 2, MAX_SEARCH);
-    searchLoop();
+    searchRunning = false;
   }
 
   searchLoop();
