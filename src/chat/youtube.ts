@@ -53,32 +53,61 @@ async function resolveChannelId(input: string, key: string) {
   return id;
 }
 
-async function findLiveId(cid: string, key: string) {
-  const r = await youtube.search.list({
+async function checkLatestLiveVideo(channelId: string, key: string) {
+  const chData = await youtube.channels.list({
     auth: key,
-    part: ["id"],
-    channelId: cid,
-    eventType: "live",
-    type: ["video"],
+    part: ["contentDetails"],
+    id: [channelId],
+  });
+
+  const uploadPlaylistId = chData.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadPlaylistId) return null;
+
+  const items = await youtube.playlistItems.list({
+    auth: key,
+    part: ["contentDetails"],
+    playlistId: uploadPlaylistId,
     maxResults: 1,
   });
-  return (r.data.items?.[0]?.id as youtube_v3.Schema$ResourceId)?.videoId ?? null;
-}
 
-async function fetchChatId(vid: string, key: string) {
-  const v = await youtube.videos.list({
+  const videoId = items.data.items?.[0]?.contentDetails?.videoId;
+  if (!videoId) return null;
+
+  const videoInfo = await youtube.videos.list({
     auth: key,
-    part: ["liveStreamingDetails"],
-    id: [vid],
+    part: ["snippet", "liveStreamingDetails"],
+    id: [videoId],
   });
-  return v.data.items?.[0]?.liveStreamingDetails?.activeLiveChatId ?? null;
+
+  const item = videoInfo.data.items?.[0];
+  if (
+    item?.snippet?.liveBroadcastContent === "live" &&
+    item?.liveStreamingDetails?.activeLiveChatId
+  ) {
+    return {
+      videoId,
+      liveChatId: item.liveStreamingDetails.activeLiveChatId,
+    };
+  }
+
+  return null;
 }
 
 export async function autoYouTubeChat(
   rawChannel: string,
-  apiKey: string,
+  rawApiKeys: string,
   push: (m: ChatMessage) => void
 ) {
+  const apiKeys = rawApiKeys.split(",").map((k) => k.trim()).filter(Boolean);
+  if (!apiKeys.length) throw new Error("Nenhuma API_KEY definida");
+  let apiIndex = 0;
+  let apiKey = apiKeys[apiIndex];
+  const rotateApiKey = () => {
+    apiIndex = (apiIndex + 1) % apiKeys.length;
+    apiKey = apiKeys[apiIndex];
+    console.warn(`[YouTube] Alternando para nova API_KEY: ${apiIndex + 1}/${apiKeys.length}`);
+  };
+
   let channelId: string;
   try {
     channelId = await resolveChannelId(rawChannel, apiKey);
@@ -90,13 +119,12 @@ export async function autoYouTubeChat(
   let liveChatId: string | null = null;
   let nextPageToken: string | undefined;
   let searchRunning = false;
+  let lastMessageTimestamp = Date.now();
+  let dynamicPollMult = 3;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  const POLL_MULT = 3;
   const MIN_POLL_DELAY = 7000;
   const MAX_SEARCH = 30 * 60_000;
   let searchInt = 15_000;
-
   let quotaErrors = 0;
 
   async function pollChat() {
@@ -110,12 +138,21 @@ export async function autoYouTubeChat(
       });
 
       nextPageToken = r.data.nextPageToken ?? undefined;
+      const items = r.data.items ?? [];
+      const now = Date.now();
+      if (items.length > 0) {
+        lastMessageTimestamp = now;
+        dynamicPollMult = 3;
+      } else if (now - lastMessageTimestamp > 60_000) {
+        dynamicPollMult = 6;
+      }
+
       const delay = Math.max(
-        (r.data.pollingIntervalMillis ?? 5_000) * POLL_MULT,
+        (r.data.pollingIntervalMillis ?? 5_000) * dynamicPollMult,
         MIN_POLL_DELAY
       );
 
-      for (const itm of r.data.items ?? []) {
+      for (const itm of items) {
         if (itm.snippet?.type !== "textMessageEvent") continue;
         push({
           platform: "youtube",
@@ -129,14 +166,14 @@ export async function autoYouTubeChat(
       quotaErrors = 0;
       setTimeout(pollChat, delay);
     } catch (e: any) {
-      const reason =
-        e?.response?.data?.error?.errors?.[0]?.reason ?? e?.code ?? "desconhecido";
+      const reason = e?.response?.data?.error?.errors?.[0]?.reason ?? e?.code ?? "desconhecido";
       console.warn(`[YouTube] pollChat error: ${reason}`);
 
       if (reason === "quotaExceeded") {
         quotaErrors++;
+        rotateApiKey();
         if (quotaErrors >= 3) {
-          console.warn("[YouTube] Limite de quota excedido repetidamente. Pausando por 1 hora.");
+          console.warn("[YouTube] Limite de quota excedido repetidamente. Pausando 1h.");
           await sleep(60 * 60_000);
         } else {
           await sleep(15 * 60_000);
@@ -157,18 +194,15 @@ export async function autoYouTubeChat(
 
     while (!liveChatId) {
       try {
-        const vid = await findLiveId(channelId, apiKey);
-        if (vid) {
-          const chat = await fetchChatId(vid, apiKey);
-          if (chat) {
-            liveChatId = chat;
-            nextPageToken = undefined;
-            searchInt = 15_000;
-            quotaErrors = 0;
-            console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
-            pollChat();
-            break;
-          }
+        const result = await checkLatestLiveVideo(channelId, apiKey);
+        if (result) {
+          liveChatId = result.liveChatId;
+          nextPageToken = undefined;
+          searchInt = 15_000;
+          quotaErrors = 0;
+          console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
+          pollChat();
+          break;
         }
       } catch (e: any) {
         console.error("[YouTube] searchLoop error:", e?.response?.data?.error ?? e);

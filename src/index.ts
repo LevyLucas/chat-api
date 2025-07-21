@@ -44,4 +44,4 @@ wss.on("connection", (socket) => {
 });
 
 initTwitch(TWITCH_CHANNEL, broadcast);
-autoYouTubeChat(process.env.YT_CHANNEL_ID!, process.env.YT_API_KEY!, broadcast);
+autoYouTubeChat(process.env.YT_CHANNEL_ID!, process.env.YT_API_KEYS!, broadcast);
