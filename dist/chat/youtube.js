@@ -115,8 +115,6 @@ async function autoYouTubeChat(rawChannel, rawApiKeys, push) {
     let dynamicPollMult = 3;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const MIN_POLL_DELAY = 7000;
-    const MAX_SEARCH = 30 * 60000;
-    let searchInt = 15000;
     let quotaErrors = 0;
     async function pollChat() {
         if (!liveChatId)
@@ -175,6 +173,12 @@ async function autoYouTubeChat(rawChannel, rawApiKeys, push) {
             searchLoop();
         }
     }
+    function isNearExpectedLiveTime() {
+        const now = new Date();
+        const hour = now.getHours();
+        const day = now.getDay();
+        return [1, 3, 6].includes(day) && hour >= 21 && hour < 23;
+    }
     async function searchLoop() {
         if (searchRunning)
             return;
@@ -185,7 +189,6 @@ async function autoYouTubeChat(rawChannel, rawApiKeys, push) {
                 if (result) {
                     liveChatId = result.liveChatId;
                     nextPageToken = undefined;
-                    searchInt = 15000;
                     quotaErrors = 0;
                     console.log(`[YouTube] ✅ Live detectada. Iniciando leitura de chat.`);
                     pollChat();
@@ -195,8 +198,7 @@ async function autoYouTubeChat(rawChannel, rawApiKeys, push) {
             catch (e) {
                 console.error("[YouTube] searchLoop error:", e?.response?.data?.error ?? e);
             }
-            await sleep(searchInt);
-            searchInt = Math.min(searchInt * 2, MAX_SEARCH);
+            await sleep(isNearExpectedLiveTime() ? 30000 : 10 * 60000);
         }
         searchRunning = false;
     }
