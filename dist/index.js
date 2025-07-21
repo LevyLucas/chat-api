@@ -40,4 +40,4 @@ wss.on("connection", (socket) => {
         socket.send(JSON.stringify(history));
 });
 (0, twitch_1.initTwitch)(TWITCH_CHANNEL, broadcast);
-(0, youtube_1.autoYouTubeChat)(process.env.YT_CHANNEL_ID, process.env.YT_API_KEY, broadcast);
+(0, youtube_1.autoYouTubeChat)(process.env.YT_CHANNEL_ID, process.env.YT_API_KEYS, broadcast);
